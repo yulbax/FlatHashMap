@@ -163,7 +163,7 @@ public:
   }
 
 private:
-  [[gnu::always_inline]] [[nodiscard]] std::size_t hash(const Key & key) const {
+  [[nodiscard]] std::size_t hash(const Key & key) const {
     return m_Hasher(key) & (m_Data.size() - 1);
   }
 
@@ -179,11 +179,11 @@ private:
     }
   }
 
-  [[gnu::always_inline]] [[nodiscard]] std::size_t nextCell(const size_t index, const std::size_t shift) const {
+  [[nodiscard]] std::size_t nextCell(const size_t index, const std::size_t shift) const {
     return (index + shift * shift) & (m_Data.size() - 1);
   }
 
-  [[gnu::always_inline]] [[nodiscard]] std::size_t findIndex(const Key & key) const {
+  [[nodiscard]] std::size_t findIndex(const Key & key) const {
     const std::size_t index = hash(key);
 
     for (std::size_t shift = 0; shift < MAX_CHAIN; ++shift) {
@@ -223,7 +223,7 @@ private:
     return getNextPosition(key);
   }
 
-  [[gnu::always_inline]] [[nodiscard]] float loadFactor() const {
+  [[nodiscard]] float loadFactor() const {
     return static_cast<float>(m_Count) / m_Data.size();
   }
 

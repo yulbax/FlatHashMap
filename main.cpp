@@ -21,8 +21,12 @@ struct StringHasher {
   }
 };
 
+template<std::size_t size>
+concept PowerOfTwo = (size != 0) && ((size & (size - 1)) == 0);
+
 template<typename Key, typename Value,
-  typename Hash = std::hash<Key>>
+         std::size_t Size = 1024, typename Hash = std::hash<Key>>
+requires PowerOfTwo<Size>
 class FlatHashMap {
   enum Status { FREE, OCCUPIED, DELETED };
 
@@ -37,16 +41,13 @@ class FlatHashMap {
     Status status;
   };
 
-  static constexpr std::size_t MAX_CHAIN = 16;
+  static constexpr std::size_t MAX_CHAIN = 256;
   static constexpr std::size_t OUT_OF_RANGE = -1;
-  static constexpr float LOAD_FACTOR = 0.6;
+  static constexpr float LOAD_FACTOR = 0.875;
 
 public:
   FlatHashMap()
-    : m_Data(1024), m_Hasher(), m_LoadFactor(LOAD_FACTOR), m_Count(0), m_PowerOfTwo(false) {}
-
-  explicit FlatHashMap(const std::size_t size)
-    : m_Data(size), m_Hasher(), m_LoadFactor(LOAD_FACTOR), m_Count(0), m_PowerOfTwo((size & (size - 1)) == 0) {}
+    : m_Data(Size), m_Hasher(), m_LoadFactor(LOAD_FACTOR), m_Count(0), m_Size(Size) {}
 
   class Iterator;
 
@@ -125,7 +126,7 @@ public:
 
   void clear() {
     m_Data.clear();
-    m_Data.resize(1024);
+    m_Data.resize(m_Size);
     m_Count = 0;
   }
 
@@ -163,7 +164,7 @@ public:
 
 private:
   [[gnu::always_inline]] [[nodiscard]] std::size_t hash(const Key & key) const {
-    return m_PowerOfTwo ? m_Hasher(key) & (m_Data.size() - 1) : m_Hasher(key) % m_Data.size();
+    return m_Hasher(key) & (m_Data.size() - 1);
   }
 
   void rehash() {
@@ -178,11 +179,15 @@ private:
     }
   }
 
+  [[gnu::always_inline]] [[nodiscard]] std::size_t nextCell(const size_t index, const std::size_t shift) const {
+    return (index + shift * shift) & (m_Data.size() - 1);
+  }
+
   [[gnu::always_inline]] [[nodiscard]] std::size_t findIndex(const Key & key) const {
     const std::size_t index = hash(key);
 
     for (std::size_t shift = 0; shift < MAX_CHAIN; ++shift) {
-      std::size_t pos = (index + shift * shift) & (m_Data.size() - 1);
+      std::size_t pos = nextCell(index, shift);
 
       if (m_Data[pos].status == FREE) break;
 
@@ -199,7 +204,7 @@ private:
     std::size_t firstDeleted = OUT_OF_RANGE;
 
     for (std::size_t shift = 0; shift < MAX_CHAIN; ++shift) {
-      std::size_t pos = (index + shift * shift) & (m_Data.size() - 1);
+      std::size_t pos = nextCell(index, shift);
 
       if (m_Data[pos].key == key) {
         return pos;
@@ -226,12 +231,13 @@ private:
   Hash m_Hasher;
   float m_LoadFactor;
   std::size_t m_Count;
-  bool m_PowerOfTwo;
+  std::size_t m_Size;
 };
 
 
-template<typename Key, typename Value, typename Hash>
-class FlatHashMap<Key, Value, Hash>::Iterator {
+template<typename Key, typename Value, std::size_t Size, typename Hash>
+requires PowerOfTwo<Size>
+class FlatHashMap<Key, Value, Size, Hash>::Iterator {
 public:
   Iterator(std::vector<Element> & data, std::size_t index)
     : m_Data(data), m_Index(index) {
@@ -263,8 +269,9 @@ private:
   std::size_t m_Index;
 };
 
-template<typename Key, typename Value, typename Hash>
-class FlatHashMap<Key, Value, Hash>::ConstIterator {
+template<typename Key, typename Value, std::size_t Size, typename Hash>
+requires PowerOfTwo<Size>
+class FlatHashMap<Key, Value, Size, Hash>::ConstIterator {
 public:
   ConstIterator(const std::vector<Element> & data, std::size_t index)
     : m_Data(data), m_Index(index) {
@@ -510,7 +517,7 @@ void testComplexTypes() {
     }
   };
 
-  FlatHashMap<Person, std::string, PersonHasher> personMap;
+  FlatHashMap<Person, std::string, 1024 ,PersonHasher> personMap;
 
   Person p1{"Alice", 30};
   Person p2{"Bob", 25};

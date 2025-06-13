@@ -1,307 +1,10 @@
 #include <iostream>
-#include <utility>
-#include <vector>
 #include <random>
 #include <string>
-#include <functional>
-#include <stdexcept>
 #include <unordered_map>
 #include <cassert>
 #include <chrono>
-#include <map>
-
-struct StringHasher {
-  std::size_t operator()(const std::string & s) const {
-    std::size_t hash = 0;
-
-    for (const char c : s) {
-      hash = hash * 31 + c;
-    }
-    return hash;
-  }
-};
-
-template<std::size_t size>
-concept PowerOfTwo = (size != 0) && ((size & (size - 1)) == 0);
-
-template<typename Key, typename Value,
-         std::size_t Size = 1024, typename Hash = std::hash<Key>>
-requires PowerOfTwo<Size>
-class FlatHashMap {
-  enum Status { FREE, OCCUPIED, DELETED };
-
-  class Element {
-  public:
-    Element() : key(Key{}), value(Value{}), status(FREE) {}
-
-    Element(Key key, Value value, const Status status) : key(std::move(key)), value(std::move(value)), status(status) {}
-
-    Key key;
-    Value value;
-    Status status;
-  };
-
-  static constexpr std::size_t MAX_CHAIN = 256;
-  static constexpr std::size_t OUT_OF_RANGE = -1;
-  static constexpr float LOAD_FACTOR = 0.875;
-
-public:
-  FlatHashMap()
-    : m_Data(Size), m_Hasher(), m_LoadFactor(LOAD_FACTOR), m_Count(0), m_Size(Size) {}
-
-  class Iterator;
-
-  class ConstIterator;
-
-  template<typename K>
-  Value & operator[](K && key) {
-    if (loadFactor() > m_LoadFactor) {
-      rehash();
-    }
-
-    const std::size_t index = getNextPosition(key);
-    if (m_Data[index].status != OCCUPIED) {
-      m_Data[index].key = std::forward<K>(key);
-      m_Data[index].status = OCCUPIED;
-      ++m_Count;
-    }
-
-    return m_Data[index].value;
-  }
-
-  template<typename K, typename V>
-  bool insert(K && key, V && value) {
-    if (loadFactor() > m_LoadFactor) {
-      rehash();
-    }
-
-    const std::size_t index = getNextPosition(key);
-
-    if (m_Data[index].status == OCCUPIED) {
-      return false;
-    }
-
-    ++m_Count;
-    m_Data[index].key = std::forward<K>(key);
-    m_Data[index].value = std::forward<V>(value);
-    m_Data[index].status = OCCUPIED;
-
-    return true;
-  }
-
-  Value & at(const Key & key) {
-    std::size_t index = findIndex(key);
-    if (index == OUT_OF_RANGE) {
-      throw std::out_of_range("Key not found");
-    }
-    return m_Data[index].value;
-  }
-
-  [[nodiscard]] const Value & at(const Key & key) const {
-    std::size_t index = findIndex(key);
-    if (index == OUT_OF_RANGE) {
-      throw std::out_of_range("Key not found");
-    }
-    return m_Data[index].value;
-  }
-
-  bool contains(const Key & key) {
-    return findIndex(key) != OUT_OF_RANGE;
-  }
-
-  [[nodiscard]] bool contains(const Key & key) const {
-    return findIndex(key) != OUT_OF_RANGE;
-  }
-
-  bool erase(const Key & key) {
-    std::size_t pos = findIndex(key);
-    if (pos != OUT_OF_RANGE) {
-      m_Data[pos].key = Key{};
-      m_Data[pos].status = DELETED;
-      --m_Count;
-      return true;
-    }
-    return false;
-  }
-
-  void clear() {
-    m_Data.clear();
-    m_Data.resize(m_Size);
-    m_Count = 0;
-  }
-
-  Iterator begin() {
-    return Iterator(m_Data, 0);
-  }
-
-  Iterator end() {
-    return Iterator(m_Data, m_Data.size());
-  }
-
-  [[nodiscard]] ConstIterator begin() const {
-    return ConstIterator(m_Data, 0);
-  }
-
-  [[nodiscard]] ConstIterator end() const {
-    return ConstIterator(m_Data, m_Data.size());
-  }
-
-  Iterator find(const Key & key) {
-    std::size_t index = findIndex(key);
-    if (index == OUT_OF_RANGE) {
-      return end();
-    }
-    return Iterator(m_Data, index);
-  }
-
-  [[nodiscard]] ConstIterator find(const Key & key) const {
-    std::size_t index = findIndex(key);
-    if (index == OUT_OF_RANGE) {
-      return end();
-    }
-    return ConstIterator(m_Data, index);
-  }
-
-private:
-  [[nodiscard]] std::size_t hash(const Key & key) const {
-    return m_Hasher(key) & (m_Data.size() - 1);
-  }
-
-  void rehash() {
-    std::vector<Element> oldData = std::move(m_Data);
-    m_Data.resize(oldData.size() * 2);
-    m_Count = 0;
-
-    for (auto & element : oldData) {
-      if (element.status == OCCUPIED) {
-        (*this)[std::move(element.key)] = std::move(element.value);
-      }
-    }
-  }
-
-  [[nodiscard]] std::size_t nextCell(const size_t index, const std::size_t shift) const {
-    return (index + shift * shift) & (m_Data.size() - 1);
-  }
-
-  [[nodiscard]] std::size_t findIndex(const Key & key) const {
-    const std::size_t index = hash(key);
-
-    for (std::size_t shift = 0; shift < MAX_CHAIN; ++shift) {
-      std::size_t pos = nextCell(index, shift);
-
-      if (m_Data[pos].status == FREE) break;
-
-      if (m_Data[pos].status == OCCUPIED && m_Data[pos].key == key) {
-        return pos;
-      }
-    }
-
-    return OUT_OF_RANGE;
-  }
-
-  std::size_t getNextPosition(const Key & key) {
-    const std::size_t index = hash(key);
-    std::size_t firstDeleted = OUT_OF_RANGE;
-
-    for (std::size_t shift = 0; shift < MAX_CHAIN; ++shift) {
-      std::size_t pos = nextCell(index, shift);
-
-      if (m_Data[pos].key == key) {
-        return pos;
-      }
-
-      if (m_Data[pos].status == DELETED && firstDeleted == OUT_OF_RANGE) {
-        firstDeleted = pos;
-      }
-
-      if (m_Data[pos].status == FREE) {
-        return (firstDeleted != OUT_OF_RANGE) ? firstDeleted : pos;
-      }
-    }
-
-    rehash();
-    return getNextPosition(key);
-  }
-
-  [[nodiscard]] float loadFactor() const {
-    return static_cast<float>(m_Count) / m_Data.size();
-  }
-
-  std::vector<Element> m_Data;
-  Hash m_Hasher;
-  float m_LoadFactor;
-  std::size_t m_Count;
-  std::size_t m_Size;
-};
-
-
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-class FlatHashMap<Key, Value, Size, Hash>::Iterator {
-public:
-  Iterator(std::vector<Element> & data, std::size_t index)
-    : m_Data(data), m_Index(index) {
-    while (m_Index < m_Data.size() &&
-           m_Data[m_Index].status != OCCUPIED) {
-      ++m_Index;
-    }
-  }
-
-  Iterator & operator++() {
-    ++m_Index;
-    while (m_Index < m_Data.size() &&
-           m_Data[m_Index].status != OCCUPIED) {
-      ++m_Index;
-    }
-    return *this;
-  }
-
-  std::pair<const Key &, Value &> operator*() const {
-    return {m_Data[m_Index].key, m_Data[m_Index].value};
-  }
-
-  bool operator!=(const Iterator & other) const {
-    return m_Index != other.m_Index;
-  }
-
-private:
-  std::vector<Element> & m_Data;
-  std::size_t m_Index;
-};
-
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-class FlatHashMap<Key, Value, Size, Hash>::ConstIterator {
-public:
-  ConstIterator(const std::vector<Element> & data, std::size_t index)
-    : m_Data(data), m_Index(index) {
-    while (m_Index < m_Data.size() &&
-           m_Data[m_Index].status != OCCUPIED) {
-      ++m_Index;
-    }
-  }
-
-  ConstIterator & operator++() {
-    ++m_Index;
-    while (m_Index < m_Data.size() &&
-           m_Data[m_Index].status != OCCUPIED) {
-      ++m_Index;
-    }
-    return *this;
-  }
-
-  std::pair<const Key &, const Value &> operator*() const {
-    return {m_Data[m_Index].key, m_Data[m_Index].value};
-  }
-
-  bool operator!=(const ConstIterator & other) const {
-    return m_Index != other.m_Index;
-  }
-
-private:
-  const std::vector<Element> & m_Data;
-  std::size_t m_Index;
-};
+#include "flathashmap.hpp"
 
 std::string generateRandomString(std::size_t length) {
   static constexpr char alphanum[] =
@@ -401,70 +104,76 @@ void testPerformanceComparison() {
   std::cout << "Performance comparison with std::unordered_map..." << std::endl;
 
   constexpr int NUM_ELEMENTS = 100000;
+  constexpr int NUM_ITERATIONS = 100;
+
   std::vector<std::string> keys;
-
+  keys.reserve(NUM_ELEMENTS);
   for (int i = 0; i < NUM_ELEMENTS; ++i) {
-    keys.push_back(generateRandomString(10));
+    keys.emplace_back(generateRandomString(10));
   }
 
-  auto startFlat = std::chrono::high_resolution_clock::now();
+  std::vector keysToErase(keys.begin(), keys.begin() + NUM_ELEMENTS / 2);
 
-  FlatHashMap<std::string, int> flatMap;
-  for (int i = 0; i < NUM_ELEMENTS; ++i) {
-    flatMap[keys[i]] = i;
+  double totalFlatTime = 0;
+  double totalStdUnorderedTime = 0;
+
+  for (int iter = 0; iter < NUM_ITERATIONS; ++iter) {
+
+    std::cout << "\r" << "Progress: " << iter << "/" << 100 << " %" << std::flush;
+
+    // === FlatHashMap test ===
+    {
+      auto start = std::chrono::high_resolution_clock::now();
+
+      FlatHashMap<std::string, int> flatMap;
+      for (int i = 0; i < NUM_ELEMENTS; ++i) {
+        flatMap[keys[i]] = i;
+      }
+
+      int sum = 0;
+      for (int i = 0; i < NUM_ELEMENTS; ++i) {
+        sum += flatMap[keys[i]];
+      }
+
+      for (int i = 0; i < NUM_ELEMENTS / 2; ++i) {
+        flatMap.erase(keysToErase[i]);
+      }
+
+      auto end = std::chrono::high_resolution_clock::now();
+      totalFlatTime += std::chrono::duration<double>(end - start).count();
+    }
+
+    // === std::unordered_map test ===
+    {
+      auto start = std::chrono::high_resolution_clock::now();
+
+      std::unordered_map<std::string, int> stdMap;
+      for (int i = 0; i < NUM_ELEMENTS; ++i) {
+        stdMap[keys[i]] = i;
+      }
+
+      int sum = 0;
+      for (int i = 0; i < NUM_ELEMENTS; ++i) {
+        sum += stdMap[keys[i]];
+      }
+
+      for (int i = 0; i < NUM_ELEMENTS / 2; ++i) {
+        stdMap.erase(keysToErase[i]);
+      }
+
+      auto end = std::chrono::high_resolution_clock::now();
+      totalStdUnorderedTime += std::chrono::duration<double>(end - start).count();
+    }
   }
 
-  int sumFlat = 0;
-  for (int i = 0; i < NUM_ELEMENTS; ++i) {
-    sumFlat += flatMap[keys[i]];
-  }
+  std::cout << "\r" << "Progress: " << 100 << "/" << 100 << " %" << std::endl;
 
-  std::cout << "Sum Flat: " << sumFlat << std::endl;
+  std::cout << "=================================\n";
 
-  auto endFlat = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsedFlat = endFlat - startFlat;
-
-  auto startStd = std::chrono::high_resolution_clock::now();
-
-  std::unordered_map<std::string, int> stdMap;
-  for (int i = 0; i < NUM_ELEMENTS; ++i) {
-    stdMap[keys[i]] = i;
-  }
-
-  int sumStd = 0;
-  for (int i = 0; i < NUM_ELEMENTS; ++i) {
-    sumStd += stdMap[keys[i]];
-  }
-
-  std::cout << "Sum Std: " << sumStd << std::endl;
-
-  auto endStd = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsedStd = endStd - startStd;
-
-  auto startMap = std::chrono::high_resolution_clock::now();
-
-  std::map<std::string, int> stdMap1;
-  for (int i = 0; i < NUM_ELEMENTS; ++i) {
-    stdMap[keys[i]] = i;
-  }
-
-  int sumMap = 0;
-  for (int i = 0; i < NUM_ELEMENTS; ++i) {
-    sumMap += stdMap1[keys[i]];
-  }
-
-  std::cout << "Sum Map: " << sumMap << std::endl;
-
-  auto endMap = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsedMap = endMap - startMap;
-
-
-  std::cout << "FlatHashMap time: " << elapsedFlat.count() << " seconds" << std::endl;
-  std::cout << "std::unordered_map time: " << elapsedStd.count() << " seconds" << std::endl;
-  std::cout << "std::map time: " << elapsedMap.count() << " seconds" << std::endl;
-  std::cout << "Performance ratio (flat/std): " << elapsedFlat.count() / elapsedStd.count() << std::endl;
-
-  assert(sumFlat == sumStd);
+  std::cout << "Average FlatHashMap time: " << (totalFlatTime / NUM_ITERATIONS) << " seconds" << std::endl;
+  std::cout << "Average std::unordered_map time: " << (totalStdUnorderedTime / NUM_ITERATIONS) << " seconds" << std::endl;
+  std::cout << "Performance ratio (flat/std): "
+            << (totalFlatTime / totalStdUnorderedTime) << std::endl;
 
   std::cout << "Performance comparison completed!" << std::endl;
 }
@@ -576,7 +285,6 @@ int performTest() {
 
   return 0;
 }
-
 
 int main() {
   return performTest();

@@ -42,9 +42,11 @@ class FlatHashMap {
   static constexpr float LOAD_FACTOR = 0.6;
 
 public:
-  FlatHashMap() : m_Data(1024), m_Hasher(), m_LoadFactor(LOAD_FACTOR), m_Count(0) {}
+  FlatHashMap()
+    : m_Data(1024), m_Hasher(), m_LoadFactor(LOAD_FACTOR), m_Count(0), m_PowerOfTwo(false) {}
 
-  explicit FlatHashMap(const Hash & hash) : m_Data(1024), m_Hasher(hash), m_LoadFactor(LOAD_FACTOR), m_Count(0) {}
+  explicit FlatHashMap(const std::size_t size)
+    : m_Data(size), m_Hasher(), m_LoadFactor(LOAD_FACTOR), m_Count(0), m_PowerOfTwo((size & (size - 1)) == 0) {}
 
   class Iterator;
 
@@ -161,7 +163,7 @@ public:
 
 private:
   [[gnu::always_inline]] [[nodiscard]] std::size_t hash(const Key & key) const {
-    return m_Hasher(key) & (m_Data.size() - 1);
+    return m_PowerOfTwo ? m_Hasher(key) & (m_Data.size() - 1) : m_Hasher(key) % m_Data.size();
   }
 
   void rehash() {
@@ -224,6 +226,7 @@ private:
   Hash m_Hasher;
   float m_LoadFactor;
   std::size_t m_Count;
+  bool m_PowerOfTwo;
 };
 
 

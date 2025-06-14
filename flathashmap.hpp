@@ -2,15 +2,14 @@
 #include <vector>
 #include <functional>
 
-template<std::size_t size>
-concept PowerOfTwo = (size != 0) && ((size & (size - 1)) == 0);
-
 template<typename Key,
          typename Value,
-         std::size_t Size = 1024,
          typename Hash = std::hash<Key>>
-         requires PowerOfTwo<Size>
 class FlatHashMap {
+
+    static constexpr std::size_t OUT_OF_RANGE = -1;
+    static constexpr std::size_t DEFAULT_SIZE = 1024;
+    static constexpr float LOAD_FACTOR = 0.875;
 
     enum class Status;
     class KeyValue;
@@ -21,7 +20,7 @@ class FlatHashMap {
     using ConstIterator = IteratorBase<const std::vector<Element>, const KeyValue>;
 
 public:
-    FlatHashMap();
+    explicit FlatHashMap(std::size_t size = DEFAULT_SIZE);
 
     template<typename K, typename V>
     bool insert(K && key, V && value);
@@ -60,8 +59,6 @@ private:
 
     [[nodiscard]] float loadFactor() const;
 
-    static constexpr std::size_t OUT_OF_RANGE = -1;
-    static constexpr float LOAD_FACTOR = 0.875;
     std::vector<Element> m_Data;
     Hash m_Hasher;
     std::size_t m_Count;

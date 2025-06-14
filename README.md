@@ -6,7 +6,7 @@ A high-performance, template-based hash map implementation using open addressing
 
 - **Open Addressing**: Uses quadratic probing for collision resolution
 - **Template-based**: Generic implementation supporting any key-value types
-- **Power-of-Two Sizing**: Enforced through C++20 concepts for optimal performance
+- **Power-of-Two Sizing**: Automatic construction with power-of-two size
 - **Automatic Rehashing**: Dynamically resizes when load factor exceeds threshold
 - **STL-Compatible**: Provides iterators and familiar interface
 - **Memory Efficient**: Flat array storage with minimal overhead
@@ -14,7 +14,7 @@ A high-performance, template-based hash map implementation using open addressing
 ## Requirements
 
 - C++20 compatible compiler
-- Standard library support for `<concepts>`, `<vector>`, and `<functional>`
+- Standard library support for `<vector>` and `<functional>`
 
 ## Usage
 
@@ -56,8 +56,8 @@ map.clear();
 ### Custom Size and Hash Function
 
 ```cpp
-// Custom size (must be power of 2)
-FlatHashMap<std::string, int, 512> customSizeMap;
+// Custom size (will be scaled automatically to power of 2)
+FlatHashMap<std::string, int> customSizeMap(512);
 
 // Custom hash function
 struct CustomHash {
@@ -66,7 +66,7 @@ struct CustomHash {
     }
 };
 
-FlatHashMap<std::string, int, 1024, CustomHash> customHashMap;
+FlatHashMap<std::string, int, CustomHash> customHashMap;
 ```
 
 ### Iteration
@@ -84,14 +84,14 @@ for (const auto& [key, value] : map) {
 
 // Iterator-based
 for (auto it = map.begin(); it != map.end(); ++it) {
-    auto [key, value] = *it;
+    auto & [key, value] = *it;
     std::cout << key << ": " << value << "\n";
 }
 
 // Find specific element
 auto it = map.find(2);
 if (it != map.end()) {
-    auto [key, value] = *it;
+    auto & [key, value] = *it;
     std::cout << "Found: " << key << " -> " << value << "\n";
 }
 ```
@@ -136,20 +136,20 @@ The container automatically rehashes when the load factor exceeds 87.5% (configu
 ### Performance Comparison
 Benchmark results comparing FlatHashMap with std::unordered_map (100,000 iterations):
 | Container               | Avg Time (seconds) |
-|------------------------|--------------------|
-| `FlatHashMap`          | **0.0122**         |
-| `std::unordered_map`   | 0.0182             |
-| `ratio (flat/std)`     | 0.67               |
+|-------------------------|--------------------|
+| `FlatHashMap`           | **0.0122**         |
+| `std::unordered_map`    | 0.0182             |
+| `ratio (flat/std)`      | 0.67               |
 
 
 ## Template Parameters
 
-| Parameter | Description | Default | Constraints |
-|-----------|-------------|---------|-------------|
-| `Key` | Key type | - | Must be equality comparable |
-| `Value` | Value type | - | Must be copy/move constructible |
-| `Size` | Initial table size | 1024 | Must be power of 2 |
-| `Hash` | Hash function type | `std::hash<Key>` | Must be callable with Key |
+| Parameter | Description        | Default          | Constraints                     |
+|-----------|--------------------|------------------|---------------------------------|
+| `Key`     | Key type           | -                | Must be equality comparable     |
+| `Value`   | Value type         | -                | Must be copy/move constructible |
+| `Size`    | Initial table size | 1024             | Must be power of 2              |
+| `Hash`    | Hash function type | `std::hash<Key>` | Must be callable with Key       |
 
 ## Thread Safety
 
@@ -158,6 +158,5 @@ This container is **not thread-safe**. External synchronization is required for 
 ## Implementation Notes
 
 - Uses `std::vector` for underlying storage
-- Bitwise AND operation for fast modulo (requires power-of-2 sizes)
-- Maximum probe distance limited to 256 to prevent infinite loops
+- Bitwise AND operation for fast modulo (size automatically scales to power-of-2)
 - Perfect forwarding for efficient key-value insertion

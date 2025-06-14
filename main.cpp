@@ -226,7 +226,7 @@ void testComplexTypes() {
     }
   };
 
-  FlatHashMap<Person, std::string, 1024 ,PersonHasher> personMap;
+  FlatHashMap<Person, std::string, PersonHasher> personMap;
 
   Person p1{"Alice", 30};
   Person p2{"Bob", 25};

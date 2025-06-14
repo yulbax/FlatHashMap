@@ -1,13 +1,11 @@
 #pragma once
 
 // NESTED OBJECTS
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-enum class FlatHashMap<Key, Value, Size, Hash>::Status { FREE, OCCUPIED, DELETED };
+template<typename Key, typename Value, typename Hash>
+enum class FlatHashMap<Key, Value, Hash>::Status { FREE, OCCUPIED, DELETED };
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-class FlatHashMap<Key, Value, Size, Hash>::KeyValue {
+template<typename Key, typename Value, typename Hash>
+class FlatHashMap<Key, Value, Hash>::KeyValue {
 public:
     KeyValue() = default;
 
@@ -19,9 +17,8 @@ public:
     Value value;
 };
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-class FlatHashMap<Key, Value, Size, Hash>::Element {
+template<typename Key, typename Value, typename Hash>
+class FlatHashMap<Key, Value, Hash>::Element {
 public:
     Element() : kv(), status(Status::FREE) {}
 
@@ -34,10 +31,9 @@ public:
 };
 
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
+template<typename Key, typename Value, typename Hash>
 template<typename VecRef, typename KeyValType>
-class FlatHashMap<Key, Value, Size, Hash>::IteratorBase {
+class FlatHashMap<Key, Value, Hash>::IteratorBase {
 public:
     IteratorBase(VecRef & data, std::size_t index)
         : m_Data(data), m_Index(index) {
@@ -70,15 +66,15 @@ private:
 };
 
 // PUBLIC METHODS
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-FlatHashMap<Key, Value, Size, Hash>::FlatHashMap()
-    : m_Data(Size), m_Hasher(), m_Count(0), m_Size(Size) {}
+template<typename Key, typename Value, typename Hash>
+FlatHashMap<Key, Value, Hash>::FlatHashMap(std::size_t size)
+    : m_Data(std::bit_ceil(size)), m_Hasher(), m_Count(0), m_Size(m_Data.size()) {}
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
+
+
+template<typename Key, typename Value, typename Hash>
 template<typename K, typename V>
-bool FlatHashMap<Key, Value, Size, Hash>::insert(K && key, V && value) {
+bool FlatHashMap<Key, Value, Hash>::insert(K && key, V && value) {
     if (loadFactor() > LOAD_FACTOR) {
         rehash();
     }
@@ -96,10 +92,9 @@ bool FlatHashMap<Key, Value, Size, Hash>::insert(K && key, V && value) {
     return true;
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
+template<typename Key, typename Value, typename Hash>
 template<typename K>
-Value & FlatHashMap<Key, Value, Size, Hash>::operator[](K && key) {
+Value & FlatHashMap<Key, Value, Hash>::operator[](K && key) {
     if (loadFactor() > LOAD_FACTOR) {
         rehash();
     }
@@ -114,9 +109,8 @@ Value & FlatHashMap<Key, Value, Size, Hash>::operator[](K && key) {
     return m_Data[index].kv.value;
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-Value & FlatHashMap<Key, Value, Size, Hash>::at(const Key & key) {
+template<typename Key, typename Value, typename Hash>
+Value & FlatHashMap<Key, Value, Hash>::at(const Key & key) {
     std::size_t index = findIndex(key);
     if (index == OUT_OF_RANGE) {
         throw std::out_of_range("Key not found");
@@ -124,9 +118,8 @@ Value & FlatHashMap<Key, Value, Size, Hash>::at(const Key & key) {
     return m_Data[index].kv.value;
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-const Value & FlatHashMap<Key, Value, Size, Hash>::at(const Key & key) const {
+template<typename Key, typename Value, typename Hash>
+const Value & FlatHashMap<Key, Value, Hash>::at(const Key & key) const {
     std::size_t index = findIndex(key);
     if (index == OUT_OF_RANGE) {
         throw std::out_of_range("Key not found");
@@ -134,15 +127,13 @@ const Value & FlatHashMap<Key, Value, Size, Hash>::at(const Key & key) const {
     return m_Data[index].kv.value;
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-bool FlatHashMap<Key, Value, Size, Hash>::contains(const Key & key) const {
+template<typename Key, typename Value, typename Hash>
+bool FlatHashMap<Key, Value, Hash>::contains(const Key & key) const {
     return findIndex(key) != OUT_OF_RANGE;
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-bool FlatHashMap<Key, Value, Size, Hash>::erase(const Key & key) {
+template<typename Key, typename Value, typename Hash>
+bool FlatHashMap<Key, Value, Hash>::erase(const Key & key) {
     std::size_t pos = findIndex(key);
     if (pos != OUT_OF_RANGE) {
         m_Data[pos].kv.key = Key{};
@@ -153,46 +144,40 @@ bool FlatHashMap<Key, Value, Size, Hash>::erase(const Key & key) {
     return false;
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-void FlatHashMap<Key, Value, Size, Hash>::clear() {
+template<typename Key, typename Value, typename Hash>
+void FlatHashMap<Key, Value, Hash>::clear() {
     m_Data.resize(m_Size);
     m_Data.clear();
     m_Count = 0;
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-FlatHashMap<Key, Value, Size, Hash>::Iterator
-FlatHashMap<Key, Value, Size, Hash>::begin() {
+template<typename Key, typename Value, typename Hash>
+FlatHashMap<Key, Value, Hash>::Iterator
+FlatHashMap<Key, Value, Hash>::begin() {
     return Iterator(m_Data, 0);
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-FlatHashMap<Key, Value, Size, Hash>::ConstIterator
-FlatHashMap<Key, Value, Size, Hash>::begin() const {
+template<typename Key, typename Value, typename Hash>
+FlatHashMap<Key, Value, Hash>::ConstIterator
+FlatHashMap<Key, Value, Hash>::begin() const {
     return ConstIterator(m_Data, 0);
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-FlatHashMap<Key, Value, Size, Hash>::Iterator
-FlatHashMap<Key, Value, Size, Hash>::end() {
+template<typename Key, typename Value, typename Hash>
+FlatHashMap<Key, Value, Hash>::Iterator
+FlatHashMap<Key, Value, Hash>::end() {
     return Iterator(m_Data, m_Data.size());
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-FlatHashMap<Key, Value, Size, Hash>::ConstIterator
-FlatHashMap<Key, Value, Size, Hash>::end() const {
+template<typename Key, typename Value, typename Hash>
+FlatHashMap<Key, Value, Hash>::ConstIterator
+FlatHashMap<Key, Value, Hash>::end() const {
     return ConstIterator(m_Data, m_Data.size());
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-FlatHashMap<Key, Value, Size, Hash>::Iterator
-FlatHashMap<Key, Value, Size, Hash>::find(const Key & key) {
+template<typename Key, typename Value, typename Hash>
+FlatHashMap<Key, Value, Hash>::Iterator
+FlatHashMap<Key, Value, Hash>::find(const Key & key) {
     std::size_t index = findIndex(key);
     if (index == OUT_OF_RANGE) {
         return end();
@@ -200,10 +185,9 @@ FlatHashMap<Key, Value, Size, Hash>::find(const Key & key) {
     return Iterator(m_Data, index);
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-FlatHashMap<Key, Value, Size, Hash>::ConstIterator
-FlatHashMap<Key, Value, Size, Hash>::find(const Key & key) const {
+template<typename Key, typename Value, typename Hash>
+FlatHashMap<Key, Value, Hash>::ConstIterator
+FlatHashMap<Key, Value, Hash>::find(const Key & key) const {
     std::size_t index = findIndex(key);
     if (index == OUT_OF_RANGE) {
         return end();
@@ -213,15 +197,13 @@ FlatHashMap<Key, Value, Size, Hash>::find(const Key & key) const {
 
 
 // PRIVATE METHODS
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-std::size_t FlatHashMap<Key, Value, Size, Hash>::hash(const Key & key) const {
+template<typename Key, typename Value, typename Hash>
+std::size_t FlatHashMap<Key, Value, Hash>::hash(const Key & key) const {
     return m_Hasher(key) & (m_Data.size() - 1);
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-void FlatHashMap<Key, Value, Size, Hash>::rehash() {
+template<typename Key, typename Value, typename Hash>
+void FlatHashMap<Key, Value, Hash>::rehash() {
     std::vector<Element> oldData = std::move(m_Data);
     m_Data.resize(oldData.size() * 2);
     m_Count = 0;
@@ -233,15 +215,13 @@ void FlatHashMap<Key, Value, Size, Hash>::rehash() {
     }
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-std::size_t FlatHashMap<Key, Value, Size, Hash>::nextCell(const std::size_t index, const std::size_t shift) const {
+template<typename Key, typename Value, typename Hash>
+std::size_t FlatHashMap<Key, Value, Hash>::nextCell(const std::size_t index, const std::size_t shift) const {
     return (index + shift) & (m_Data.size() - 1);
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-std::size_t FlatHashMap<Key, Value, Size, Hash>::findIndex(const Key & key) const {
+template<typename Key, typename Value, typename Hash>
+std::size_t FlatHashMap<Key, Value, Hash>::findIndex(const Key & key) const {
     const std::size_t index = hash(key);
     std::size_t shift = 0;
 
@@ -260,9 +240,8 @@ std::size_t FlatHashMap<Key, Value, Size, Hash>::findIndex(const Key & key) cons
     return OUT_OF_RANGE;
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-std::size_t FlatHashMap<Key, Value, Size, Hash>::getNextPosition(const Key & key) const {
+template<typename Key, typename Value, typename Hash>
+std::size_t FlatHashMap<Key, Value, Hash>::getNextPosition(const Key & key) const {
     const std::size_t index = hash(key);
     std::size_t firstDeleted = OUT_OF_RANGE;
     std::size_t shift = 0;
@@ -284,8 +263,7 @@ std::size_t FlatHashMap<Key, Value, Size, Hash>::getNextPosition(const Key & key
     }
 }
 
-template<typename Key, typename Value, std::size_t Size, typename Hash>
-requires PowerOfTwo<Size>
-float FlatHashMap<Key, Value, Size, Hash>::loadFactor() const {
+template<typename Key, typename Value, typename Hash>
+float FlatHashMap<Key, Value, Hash>::loadFactor() const {
     return static_cast<float>(m_Count) / m_Data.size();
 }

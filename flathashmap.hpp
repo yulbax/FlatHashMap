@@ -13,9 +13,12 @@ template<typename Key,
 class FlatHashMap {
 
     enum class Status;
+    class KeyValue;
     class Element;
-    template<bool isConst>
-    class Iterator;
+    template<typename VecType, typename KeyValType>
+    class IteratorBase;
+    using Iterator = IteratorBase<std::vector<Element>, KeyValue>;
+    using ConstIterator = IteratorBase<const std::vector<Element>, const KeyValue>;
 
 public:
     FlatHashMap();
@@ -35,14 +38,14 @@ public:
 
     void clear();
 
-    Iterator<false> find(const Key & key);
-    [[nodiscard]] Iterator<true> find(const Key & key) const;
+    Iterator find(const Key & key);
+    [[nodiscard]] ConstIterator find(const Key & key) const;
 
-    Iterator<false> begin();
-    [[nodiscard]] Iterator<true> begin() const;
+    Iterator begin();
+    [[nodiscard]] ConstIterator begin() const;
 
-    Iterator<false> end();
-    [[nodiscard]] Iterator<true> end() const;
+    Iterator end();
+    [[nodiscard]] ConstIterator end() const;
 
 private:
     [[nodiscard]] std::size_t hash(const Key & key) const;

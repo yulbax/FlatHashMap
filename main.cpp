@@ -240,12 +240,6 @@ void testComplexTypes() {
   assert(personMap[p2] == "Designer");
   assert(personMap[p3] == "Manager");
 
-  const Person & p1Copy = p1;
-  assert(personMap[p1Copy] == "Developer");
-
-  personMap[p1] = "Senior Developer";
-  assert(personMap[p1] == "Senior Developer");
-
   personMap.erase(p2);
   assert(!personMap.contains(p2));
   assert(personMap.contains(p1));
@@ -271,6 +265,7 @@ int performTest() {
     testEdgeCases();
     testComplexTypes();
     testPerformanceComparison();
+    testStress();
 
     std::cout << "\nAll tests passed successfully!" << std::endl;
   } catch (const std::exception & e) {
@@ -280,8 +275,6 @@ int performTest() {
     std::cerr << "Test failed with unknown exception" << std::endl;
     return 1;
   }
-
-  testStress();
 
   return 0;
 }

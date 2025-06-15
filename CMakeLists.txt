@@ -5,7 +5,8 @@ set(CMAKE_CXX_STANDARD 23)
 
 add_executable(FlatHashMap main.cpp
         flathashmap.hpp
-        flathashmap.tpp)
+        flathashmap.tpp
+        flathashmapimpl.hpp)
 
 
 

@@ -1,70 +1,5 @@
 #pragma once
 
-// NESTED OBJECTS
-template<typename Key, typename Value, typename Hash>
-enum class FlatHashMap<Key, Value, Hash>::Status { FREE, OCCUPIED, DELETED };
-
-template<typename Key, typename Value, typename Hash>
-class FlatHashMap<Key, Value, Hash>::KeyValue {
-public:
-    KeyValue() = default;
-
-    template <typename K, typename V>
-    KeyValue(K && k, V && v)
-        : key(std::forward<K>(k)), value(std::forward<V>(v)) {}
-
-    Key key;
-    Value value;
-};
-
-template<typename Key, typename Value, typename Hash>
-class FlatHashMap<Key, Value, Hash>::Element {
-public:
-    Element() : kv(), status(Status::FREE) {}
-
-    template <typename K, typename V>
-    Element(K && key, V && value)
-        : kv(std::forward<K>(key), std::forward<V>(value)), status(Status::FREE) {}
-
-    KeyValue kv;
-    Status status;
-};
-
-
-template<typename Key, typename Value, typename Hash>
-template<typename VecRef, typename KeyValType>
-class FlatHashMap<Key, Value, Hash>::IteratorBase {
-public:
-    IteratorBase(VecRef & data, std::size_t index)
-        : m_Data(data), m_Index(index) {
-        skipToOccupied();
-    }
-
-    IteratorBase & operator++() {
-        ++m_Index;
-        skipToOccupied();
-        return *this;
-    }
-
-    KeyValType & operator*() const {
-        return m_Data[m_Index].kv;
-    }
-
-    bool operator!=(const IteratorBase& other) const {
-        return m_Index != other.m_Index;
-    }
-
-private:
-    void skipToOccupied() {
-        while (m_Index < m_Data.size() && m_Data[m_Index].status != Status::OCCUPIED) {
-            ++m_Index;
-        }
-    }
-
-    VecRef & m_Data;
-    std::size_t m_Index;
-};
-
 // PUBLIC METHODS
 template<typename Key, typename Value, typename Hash>
 FlatHashMap<Key, Value, Hash>::FlatHashMap(std::size_t size)
@@ -136,7 +71,6 @@ template<typename Key, typename Value, typename Hash>
 bool FlatHashMap<Key, Value, Hash>::erase(const Key & key) {
     std::size_t pos = findIndex(key);
     if (pos != OUT_OF_RANGE) {
-        m_Data[pos].kv.key = Key{};
         m_Data[pos].status = Status::DELETED;
         --m_Count;
         return true;
@@ -249,7 +183,7 @@ std::size_t FlatHashMap<Key, Value, Hash>::getNextPosition(const Key & key) cons
     while (true) {
         std::size_t pos = nextCell(index, shift);
 
-        if (m_Data[pos].kv.key == key) return pos;
+        if (m_Data[pos].kv.key == key && m_Data[pos].status == Status::OCCUPIED) return pos;
 
         if (m_Data[pos].status == Status::DELETED && firstDeleted == OUT_OF_RANGE) {
             firstDeleted = pos;

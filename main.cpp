@@ -5,6 +5,8 @@
 #include <cassert>
 #include <chrono>
 #include "flathashmap.hpp"
+#include <boost/unordered/unordered_flat_map.hpp>
+
 
 std::string generateRandomString(std::size_t length) {
   static constexpr char alphanum[] =

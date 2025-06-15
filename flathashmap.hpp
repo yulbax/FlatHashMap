@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <functional>
+#include "flathashmapimpl.hpp"
 
 template<typename Key,
          typename Value,
@@ -11,13 +12,12 @@ class FlatHashMap {
     static constexpr std::size_t DEFAULT_SIZE = 1024;
     static constexpr float LOAD_FACTOR = 0.875;
 
-    enum class Status;
-    class KeyValue;
-    class Element;
-    template<typename VecType, typename KeyValType>
-    class IteratorBase;
-    using Iterator = IteratorBase<std::vector<Element>, KeyValue>;
-    using ConstIterator = IteratorBase<const std::vector<Element>, const KeyValue>;
+    using Status = FlatHashMapImpl::Status;
+    using KeyValue = FlatHashMapImpl::KeyValue<Key, Value>;
+    using Element = FlatHashMapImpl::Element<Key, Value>;
+
+    using Iterator = FlatHashMapImpl::Iterator<Key, Value>;
+    using ConstIterator = FlatHashMapImpl::ConstIterator<Key, Value>;
 
 public:
     explicit FlatHashMap(std::size_t size = DEFAULT_SIZE);
